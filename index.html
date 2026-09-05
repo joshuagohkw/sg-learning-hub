@@ -1180,7 +1180,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
       <br>
       <p><strong>AI Generated</strong> <span class="source-tag ai"><span class="dot"></span>AI</span> — Uses AI to create unique, contextual questions tailored to the student's level and weaknesses. Requires internet and an API key. Falls back to local if AI is unavailable.</p>
       <br>
-      <p><strong>Real Exam</strong> <span class="source-tag exam"><span class="dot"></span>Exam</span> — Real questions transcribed from actual 2025 Singapore school exam papers (shows the school and term it came from). Always available offline. Currently covers Primary 2-5 for Math/English/Chinese and Primary 3-5 for Science -- other levels/subjects use Local/AI until more papers are added.</p>
+      <p><strong>Real Exam</strong> <span class="source-tag exam"><span class="dot"></span>Exam</span> — Real questions transcribed from actual 2025 Singapore school exam papers (shows the school and term it came from). Always available offline. Currently covers Primary 2-6 for English, Primary 2-5 for Math/Chinese, and Primary 3-5 for Science -- other levels/subjects use Local/AI until more papers are added.</p>
     </div>
   </div>
 </div>
@@ -7033,8 +7033,8 @@ function genBTOddOneOut(level, diff) {
 /* ============================================================
    JS: EXAM QUESTION BANK (real past papers)
    Real questions transcribed from actual 2025 Singapore Primary school
-   exam papers (currently Primary 2-5 for Math/English/Chinese, Primary 3-5
-   for Science; most source PDFs had no
+   exam papers (currently Primary 2-6 for English, Primary 2-5 for Math/Chinese,
+   Primary 3-5 for Science; most source PDFs had no
    answer key, so answers were derived/verified independently during
    extraction, cross-checked against an official key where the paper
    included one).
