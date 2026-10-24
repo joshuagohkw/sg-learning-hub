@@ -3506,11 +3506,20 @@ var NAMES = [
   ['Priya','f'], ['Ahmad','m'], ['Mei Ling','f'], ['Arjun','m'], ['Nurul','f'],
   ['Ethan','m'], ['Zhi Ying','f'], ['Deepak','m'], ['Fatimah','f'], ['Liam','m']
 ];
-function rName() { return pick(NAMES)[0]; }
+/* A question that names two people must never use the same name twice, so remember the last
+   name handed out and pick again if it comes up straight away. */
+var lastNamePicked = null;
+function pickNameEntry() {
+  var n = pick(NAMES);
+  for (var i = 0; i < 10 && n[0] === lastNamePicked; i++) n = pick(NAMES);
+  lastNamePicked = n[0];
+  return n;
+}
+function rName() { return pickNameEntry()[0]; }
 /* Picks a name together with matching pronouns, so templates that need a pronoun
    never mismatch it against the name (e.g. "Fatimah ... He gives away ..."). */
 function rNameG() {
-  var n = pick(NAMES);
+  var n = pickNameEntry();
   var isF = n[1] === 'f';
   return {
     name: n[0], S: isF ? 'She' : 'He', s: isF ? 'she' : 'he',
@@ -3769,6 +3778,7 @@ function genMathMoney(level, diff) {
   var priceA = (rInt(1, 5 + diff * 2) * 0.5).toFixed(2);
   var priceB = (rInt(1, 4 + diff) * 0.5).toFixed(2);
   var paid = Math.ceil((parseFloat(priceA) + parseFloat(priceB)) / 5) * 5;
+  if (paid - parseFloat(priceA) - parseFloat(priceB) < 0.5) paid += 5; /* always some change */
   var change = (paid - parseFloat(priceA) - parseFloat(priceB)).toFixed(2);
   var p = rNameG();
   var ans = '$' + change;
@@ -3788,6 +3798,8 @@ function genMathMoney(level, diff) {
 function genMathRatio(level, diff) {
   var r1 = rInt(2, 4 + diff);
   var r2 = rInt(2, 5 + diff);
+  /* Ratios in simplest form, with two different parts (no 4:4, 6:3 ...). */
+  for (var tries = 0; (r1 === r2 || gcd(r1, r2) !== 1) && tries < 50; tries++) { r1 = rInt(2, 4 + diff); r2 = rInt(2, 5 + diff); }
   var mult = rInt(2, 6 + diff);
   var qty1 = r1 * mult;
   var ans = r2 * mult;
@@ -3934,7 +3946,7 @@ function genMathWorkingBackwards(level, diff) {
 /* Math: Constant Total (P4+) — classic "transfer" problem */
 function genMathConstantTotal(level, diff) {
   var r1 = rInt(2, 5), r2 = rInt(2, 5);
-  while (r2 === r1) r2 = rInt(2, 5);
+  while (r2 === r1 || gcd(r1, r2) !== 1) r2 = rInt(2, 5);
   var totalParts = r1 + r2;
   var unit = rInt(3, 9);
   var total = totalParts * unit;
@@ -3964,7 +3976,7 @@ function genMathConstantDifference(level, diff) {
     futureB = r2 * unit;
     currentB = futureB - n;
     attempts++;
-  } while (currentB < 3 && attempts < 30);
+  } while ((currentB < 3 || gcd(r1, r2) !== 1) && attempts < 30);
   /* Bounded retry, not recursion -- an unlucky draw here shouldn't be able to
      recurse indefinitely. In the near-impossible case all 30 draws land invalid,
      shrink n so the scenario is still valid rather than serving a negative age. */
@@ -4153,7 +4165,7 @@ function genMathAverage(level, diff) {
   var missing = total - sumGiven;
   if (missing < 1) return genMathAverage(level, diff); // extremely rare; regenerate
   var opts = generateNumericOptions(missing, Math.max(2, Math.floor(missing * 0.2) + 1));
-  var thing = pick(['test scores', 'the number of books read', 'points scored']);
+  var thing = pick(['test scores', 'quiz marks', 'points scored', 'goals scored']);
   return { text: 'The average of ' + n + ' ' + thing + ' is ' + avg + '. ' + (n - 1) + ' of them are ' + given.join(', ') + '. What is the last one?',
     options: opts.map(String), answer: opts.indexOf(missing), category: 'Math', diffLevel: diff, source: 'local',
     explanation: 'Step 1: Total = average × count = ' + avg + ' × ' + n + ' = ' + total + '\nStep 2: Sum of the given = ' + given.join(' + ') + ' = ' + sumGiven + '\nStep 3: Last one = ' + total + ' − ' + sumGiven + ' = ' + missing };
