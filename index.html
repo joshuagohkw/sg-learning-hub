@@ -1665,9 +1665,10 @@ var PROVIDER_DEFAULTS = {
    APP_UPDATED and APP_WHATS_NEW.
    ============================================================ */
 var APP_VERSION = '2.0';
-var APP_BUILD = 68;
+var APP_BUILD = 69;
 var APP_UPDATED = '24 October 2026';
 var APP_WHATS_NEW = [
+  'Clearer shape diagrams (every measurement now sits outside its own edge) and properly centred pictures.',
   'Pick a subject after choosing a level: Maths, Science, English, Chinese or Fun.',
   'Every question now fits the level you choose (a P1 quiz has no P4 questions).',
   'Over 300 new questions for P1 to P6, including new Maths topics.',
@@ -4527,19 +4528,36 @@ function buildClockFaceSVG(hour, minute) {
    matching the "composite shape" format the P3 Math exam-paper research flagged as
    heavily tested but under-represented in the app's existing text-only generator). */
 function buildRectDiagramSVG(shapeSpec) {
-  var W = 300, H = 220, scale = 8, ox = 60, oy = 40;
-  var inner = '';
-  function labeledRect(x, y, w, h) {
-    var s = '<rect x="' + x + '" y="' + y + '" width="' + (w * scale) + '" height="' + (h * scale) + '" fill="#eef2ff" stroke="#4f46e5" stroke-width="2"/>';
-    s += '<text x="' + (x + w * scale / 2) + '" y="' + (y - 8) + '" font-size="13" font-weight="700" fill="#1f2937" text-anchor="middle" font-family="sans-serif">' + w + ' cm</text>';
-    s += '<text x="' + (x - 10) + '" y="' + (y + h * scale / 2 + 4) + '" font-size="13" font-weight="700" fill="#1f2937" text-anchor="end" font-family="sans-serif">' + h + ' cm</text>';
-    return s;
+  /* One clean outline (the two rectangles of a composite shape are drawn as ONE stepped
+     outline, so there is no line through the middle), scaled to fill the picture, with every
+     measurement written OUTSIDE the edge it belongs to -- nothing overlaps the shape. */
+  var W = 360, H = 270, mx = 78, my = 52;
+  var isComp = shapeSpec.type === 'composite';
+  var totalW = isComp ? shapeSpec.w1 + shapeSpec.w2 : shapeSpec.w;
+  var totalH = isComp ? shapeSpec.h1 : shapeSpec.h;
+  var scale = Math.min((W - 2 * mx) / totalW, (H - 2 * my) / totalH, 24);
+  var ox = Math.round((W - totalW * scale) / 2), oy = Math.round((H - totalH * scale) / 2);
+  function X(u) { return Math.round(ox + u * scale); }
+  function Y(u) { return Math.round(oy + u * scale); }
+  function label(x, y, txt, anchor) {
+    return '<text x="' + x + '" y="' + y + '" font-size="15" font-weight="700" fill="#1f2937" text-anchor="' + anchor + '" font-family="sans-serif">' + txt + ' cm</text>';
   }
-  if (shapeSpec.type === 'composite') {
-    inner += labeledRect(ox, oy, shapeSpec.w1, shapeSpec.h1);
-    inner += labeledRect(ox + shapeSpec.w1 * scale, oy + (shapeSpec.h1 - shapeSpec.h2) * scale, shapeSpec.w2, shapeSpec.h2);
+  var inner = '';
+  if (isComp) {
+    var w1 = shapeSpec.w1, h1 = shapeSpec.h1, w2 = shapeSpec.w2, h2 = shapeSpec.h2;
+    var step = h1 - h2;
+    var pts = [[0, 0], [w1, 0], [w1, step], [w1 + w2, step], [w1 + w2, h1], [0, h1]].map(function(p) { return X(p[0]) + ',' + Y(p[1]); }).join(' ');
+    inner += '<polygon points="' + pts + '" fill="#eef2ff" stroke="#4f46e5" stroke-width="3" stroke-linejoin="round"/>';
+    inner += label(X(w1 / 2), Y(0) - 10, w1, 'middle');                 /* top edge of the tall part */
+    inner += label(X(0) - 10, Y(h1 / 2) + 5, h1, 'end');                /* left edge */
+    /* top edge of the low part; a narrow step gets its label set just to the right, clear of the tall side */
+    if (w2 * scale < 52) inner += label(X(w1) + 8, Y(step) - 10, w2, 'start');
+    else inner += label(X(w1 + w2 / 2), Y(step) - 10, w2, 'middle');
+    inner += label(X(w1 + w2) + 10, Y(step + h2 / 2) + 5, h2, 'start'); /* right edge of the low part */
   } else {
-    inner += labeledRect(ox, oy, shapeSpec.w, shapeSpec.h);
+    inner += '<rect x="' + X(0) + '" y="' + Y(0) + '" width="' + Math.round(totalW * scale) + '" height="' + Math.round(totalH * scale) + '" fill="#eef2ff" stroke="#4f46e5" stroke-width="3"/>';
+    inner += label(X(totalW / 2), Y(0) - 10, shapeSpec.w, 'middle');
+    inner += label(X(0) - 10, Y(totalH / 2) + 5, shapeSpec.h, 'end');
   }
   return '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" style="background:#fff">' + inner + '</svg>';
 }
@@ -5013,7 +5031,7 @@ function genMathAreaPerimDiagram(level, diff) {
     var perimeter = 2 * ((w1 + w2) + h1);
     if (askArea) {
       correctVal = area;
-      explanation = 'Split the shape into two rectangles: ' + w1 + ' x ' + h1 + ' = ' + (w1 * h1) + ' cm^2, and ' + w2 + ' x ' + h2 + ' = ' + (w2 * h2) + ' cm^2. Add them: ' + (w1 * h1) + ' + ' + (w2 * h2) + ' = ' + area + ' cm^2.';
+      explanation = 'Split the shape into two rectangles: ' + w1 + ' x ' + h1 + ' = ' + (w1 * h1) + ' cm², and ' + w2 + ' x ' + h2 + ' = ' + (w2 * h2) + ' cm². Add them: ' + (w1 * h1) + ' + ' + (w2 * h2) + ' = ' + area + ' cm².';
     } else {
       correctVal = perimeter;
       explanation = 'Since the shape only steps in one direction, its perimeter equals 2 x (total width + total height). Total width = ' + w1 + ' + ' + w2 + ' = ' + (w1 + w2) + ' cm. Total height = ' + h1 + ' cm. Perimeter = 2 x (' + (w1 + w2) + ' + ' + h1 + ') = ' + perimeter + ' cm.';
@@ -5023,14 +5041,14 @@ function genMathAreaPerimDiagram(level, diff) {
     shapeSpec = { type: 'rect', w: w, h: h };
     if (askArea) {
       correctVal = w * h;
-      explanation = 'Area = length x breadth = ' + w + ' x ' + h + ' = ' + correctVal + ' cm^2.';
+      explanation = 'Area = length x breadth = ' + w + ' x ' + h + ' = ' + correctVal + ' cm².';
     } else {
       correctVal = 2 * (w + h);
       explanation = 'Perimeter = 2 x (length + breadth) = 2 x (' + w + ' + ' + h + ') = ' + correctVal + ' cm.';
     }
   }
 
-  var unit = askArea ? 'cm^2' : 'cm';
+  var unit = askArea ? 'cm²' : 'cm';
   var opts = generateNumericOptions(correctVal, Math.max(2, Math.floor(correctVal * 0.15) + 1));
   var diagramImage = 'data:image/svg+xml,' + encodeURIComponent(buildRectDiagramSVG(shapeSpec));
   var diagramAlt = isComposite
@@ -7313,7 +7331,14 @@ function buildVocabIconSVG(iconType) {
   var W = 200, H = 200;
   /* drawSceneIcon draws at scene scale (small props among many); scale it up
      and re-anchor around the canvas centre so a single icon fills the frame. */
-  var icon = '<g transform="translate(100 100) scale(2.2) translate(-100 -150)">' + drawSceneIcon({ icon: iconType, x: 100, y: 150 }) + '</g>';
+  /* Each icon is a different size, so fit each one to the frame using its measured box
+     [x, y, width, height] (drawn at x:100, y:150): centred, with an even margin, never clipped. */
+  var boxes = { sun: [73, 123, 54, 54], tree: [76, 84, 48, 66], dog: [79.4, 130, 43.6, 26], umbrella: [80, 100, 40, 56],
+    balloon: [88, 122, 24, 48], cake: [84, 122, 32, 28], kite: [84, 126, 32, 70], table: [74, 144, 52, 22] };
+  var bb = boxes[iconType];
+  var fit = bb ? Math.min(152 / bb[2], 152 / bb[3], 4) : 2.2;
+  var cx = bb ? bb[0] + bb[2] / 2 : 100, cy = bb ? bb[1] + bb[3] / 2 : 150;
+  var icon = '<g transform="translate(100 100) scale(' + fit.toFixed(3) + ') translate(' + (-cx) + ' ' + (-cy) + ')">' + drawSceneIcon({ icon: iconType, x: 100, y: 150 }) + '</g>';
   var inner = '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="#f8fafc"/>' + icon;
   return '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg">' + inner + '</svg>';
 }
@@ -7803,7 +7828,7 @@ EXTRA_ITEMS.Science = [
 ];
 EXTRA_ITEMS.English = [
   [1,2,"Choose the correct word to fill in the blank:\n\n\"I have ___ apple for recess.\"","an","a","the","many","Use \"an\" before a word that starts with a vowel sound. \"Apple\" starts with the vowel sound /a/."],
-  [1,2,"Choose the correct word to fill in the blank:\n\n\"She has ___ umbrella.\"","an","a","some a","many","\"Umbrella\" begins with a vowel sound, so we use \"an\"."],
+  [1,2,"Choose the correct word to fill in the blank:\n\n\"She has ___ umbrella.\"","an","a","much","many","\"Umbrella\" begins with a vowel sound, so we use \"an\"."],
   [1,2,"Choose the correct word to fill in the blank:\n\n\"He has ___ book on the table.\"","a","an","many","are","\"Book\" starts with a consonant sound, so we use \"a\"."],
   [1,2,"Choose the correct word to fill in the blank:\n\n\"Look at the two ___ in the garden.\"","birds","bird","a bird","birdes","When there are two or more, we add -s to most nouns: two birds."],
   [1,2,"What is the plural of \"box\"?","boxes","boxs","boxies","boxen","Nouns that end in -x add -es to make the plural."],
