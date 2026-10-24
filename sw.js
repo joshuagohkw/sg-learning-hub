@@ -1,4 +1,4 @@
-var CACHE_NAME = 'sg-learning-hub-v66';
+var CACHE_NAME = 'sg-learning-hub-v67';
 var URLS_TO_CACHE = [
   './',
   './index.html',
@@ -42,21 +42,19 @@ self.addEventListener('fetch', function(event) {
     return;
   }
 
-  // Cache-first for app shell
+  // Network-first for the app shell, so a new release shows up the next time the app is
+  // opened (no more "I still see the old version"). The cached copy is only used offline.
   event.respondWith(
-    caches.match(event.request).then(function(cached) {
-      var fetchPromise = fetch(event.request).then(function(response) {
-        if (response && response.status === 200 && response.type === 'basic') {
-          var clone = response.clone();
-          caches.open(CACHE_NAME).then(function(cache) {
-            cache.put(event.request, clone);
-          });
-        }
-        return response;
-      }).catch(function() {
-        return cached;
-      });
-      return cached || fetchPromise;
+    fetch(event.request, { cache: 'no-cache' }).then(function(response) {
+      if (response && response.status === 200 && response.type === 'basic') {
+        var clone = response.clone();
+        caches.open(CACHE_NAME).then(function(cache) {
+          cache.put(event.request, clone);
+        });
+      }
+      return response;
+    }).catch(function() {
+      return caches.match(event.request);
     })
   );
 });
