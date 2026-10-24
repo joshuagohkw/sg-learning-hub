@@ -164,6 +164,18 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .resume-banner .resume-banner-text { font-size: 0.95rem; }
 .resume-banner .resume-banner-text strong { display: block; font-size: 1.05rem; margin-bottom: 2px; }
 .resume-banner .submit-btn { padding: 10px 24px; min-width: auto; font-size: 0.95rem; }
+.update-banner {
+  display: none; align-items: center; justify-content: space-between; gap: 14px;
+  background: var(--card); border: 2px solid var(--accent2, #16a34a);
+  border-radius: var(--radius); padding: 14px 20px; box-shadow: var(--shadow);
+  margin-top: 20px; cursor: pointer; font-size: 0.92rem;
+}
+.update-banner.show { display: flex; }
+.app-version-line { text-align: center; font-size: 0.78rem; color: var(--text2); margin: 22px 0 6px; cursor: pointer; opacity: 0.85; }
+.version-status { font-size: 0.9rem; font-weight: 600; margin: 10px 0; }
+.version-status.ok { color: var(--accent2, #16a34a); }
+.version-status.new { color: #b45309; }
+.whats-new { font-size: 0.85rem; color: var(--text2); line-height: 1.7; padding-left: 20px; margin-top: 8px; }
 .ai-nudge-banner {
   display: flex; align-items: center; justify-content: space-between; gap: 14px;
   background: var(--card); border: 2px dashed var(--accent);
@@ -856,7 +868,11 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     <div class="ai-nudge-text">✨ <strong>Try AI-generated questions</strong> — tap to set up (needs your own free API key)</div>
     <button class="ai-nudge-dismiss" onclick="dismissAINudge(event)" aria-label="Dismiss">&times;</button>
   </div>
+  <div class="update-banner" id="update-banner" onclick="showScreen('settings')">
+    <div>🎉 <strong>A new version of the app is ready</strong> — tap to update</div>
+  </div>
   <div class="level-grid" id="level-grid"></div>
+  <div class="app-version-line" id="app-version-line" onclick="showScreen('settings')"></div>
 </div>
 
 <!-- ============================================================
@@ -1133,6 +1149,21 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
       </div>
     </div>
     <div class="setting-hint" id="quiz-timer-hint" style="display:none">If time runs out, the question is marked as answered (incorrect) and the next one loads -- same as any other wrong answer.</div>
+  </div>
+
+  <div class="settings-panel" id="version-panel">
+    <h3>ℹ️ App Version</h3>
+    <div style="font-size:0.95rem;font-weight:700" id="app-version-text"></div>
+    <div style="font-size:0.82rem;color:var(--text2);margin-top:2px" id="app-version-date"></div>
+    <div class="version-status" id="version-status">Tap the button to see if a newer version is available.</div>
+    <div class="setting-row">
+      <label></label>
+      <button class="submit-btn" id="version-check-btn" style="padding:10px 20px;font-size:0.85rem;min-width:auto" onclick="checkForUpdate(true)">🔄 Check for updates</button>
+      <button class="submit-btn" id="version-update-btn" style="padding:10px 20px;font-size:0.85rem;min-width:auto;display:none" onclick="applyUpdate()">⬇️ Update now</button>
+    </div>
+    <div style="font-size:0.85rem;font-weight:700;margin-top:6px">What's new in this version</div>
+    <ul class="whats-new" id="app-whats-new"></ul>
+    <div class="setting-hint" style="padding-left:0;margin-top:8px">Updating keeps all your progress, pet and scores. They are saved on this device, not in the app files.</div>
   </div>
 
   <div class="settings-panel">
@@ -1625,7 +1656,80 @@ var PROVIDER_DEFAULTS = {
   anthropic: { placeholder: 'sk-ant-... (Anthropic API key)', model: 'claude-sonnet-5', modelHint: 'Claude models require a paid API key from Anthropic.' }
 };
 
+/* ============================================================
+   APP VERSION -- shown in Settings and on the home screen, and used to tell people
+   when a newer release is available.
+   APP_BUILD must equal the number in sw.js ('sg-learning-hub-vNN'): the update check
+   downloads sw.js and compares the two. scripts/build-public.js refuses to publish
+   if they disagree. When releasing: bump APP_BUILD + sw.js together, then update
+   APP_UPDATED and APP_WHATS_NEW.
+   ============================================================ */
+var APP_VERSION = '2.0';
+var APP_BUILD = 68;
+var APP_UPDATED = '24 October 2026';
+var APP_WHATS_NEW = [
+  'Pick a subject after choosing a level: Maths, Science, English, Chinese or Fun.',
+  'Every question now fits the level you choose (a P1 quiz has no P4 questions).',
+  'Over 300 new questions for P1 to P6, including new Maths topics.',
+  'Latest Singapore news questions in Maths and English, refreshed every month.',
+  'Fixed word problems that used the same name twice and ratios that were not in simplest form.'
+];
+var updateAvailableBuild = null;
+function renderVersionInfo() {
+  var line = document.getElementById('app-version-line');
+  if (line) line.textContent = 'Version ' + APP_VERSION + ' (build ' + APP_BUILD + ') · updated ' + APP_UPDATED;
+  var t = document.getElementById('app-version-text');
+  if (t) t.textContent = 'Version ' + APP_VERSION + ' (build ' + APP_BUILD + ')';
+  var d = document.getElementById('app-version-date');
+  if (d) d.textContent = 'Last updated ' + APP_UPDATED;
+  var ul = document.getElementById('app-whats-new');
+  if (ul && !ul.childNodes.length) {
+    APP_WHATS_NEW.forEach(function(item) { var li = document.createElement('li'); li.textContent = item; ul.appendChild(li); });
+  }
+  var banner = document.getElementById('update-banner');
+  if (banner) banner.classList.toggle('show', updateAvailableBuild !== null);
+  var st = document.getElementById('version-status');
+  var upd = document.getElementById('version-update-btn');
+  if (st && updateAvailableBuild !== null) {
+    st.className = 'version-status new';
+    st.textContent = 'A newer version is available (build ' + updateAvailableBuild + '). Tap Update now.';
+    if (upd) upd.style.display = '';
+  }
+}
+/* Looks at the live sw.js (never from cache) to learn the newest build number. */
+function checkForUpdate(manual) {
+  var st = document.getElementById('version-status');
+  if (manual && st) { st.className = 'version-status'; st.textContent = 'Checking...'; }
+  if (location.protocol === 'file:') { if (manual && st) st.textContent = 'Update checks only work in the online app.'; return; }
+  fetch('./sw.js?check=' + Date.now(), { cache: 'no-store' }).then(function(r) { return r.text(); }).then(function(txt) {
+    var m = txt.match(/sg-learning-hub-v(\d+)/);
+    if (!m) throw new Error('no version');
+    var latest = parseInt(m[1], 10);
+    if (latest > APP_BUILD) {
+      updateAvailableBuild = latest;
+    } else {
+      updateAvailableBuild = null;
+      if (st) { st.className = 'version-status ok'; st.textContent = "✅ You're up to date. This is the newest version."; }
+      var upd = document.getElementById('version-update-btn'); if (upd) upd.style.display = 'none';
+    }
+    renderVersionInfo();
+  }).catch(function() {
+    if (manual && st) { st.className = 'version-status'; st.textContent = "Couldn't check right now. Please make sure you are online and try again."; }
+  });
+}
+/* Clears the saved app files (NOT the progress, which lives in localStorage) and reloads. */
+function applyUpdate() {
+  var st = document.getElementById('version-status');
+  if (st) st.textContent = 'Updating...';
+  var done = function() { location.reload(); };
+  var work = [];
+  if ('caches' in window) work.push(caches.keys().then(function(keys) { return Promise.all(keys.map(function(k) { return caches.delete(k); })); }));
+  if ('serviceWorker' in navigator) work.push(navigator.serviceWorker.getRegistrations().then(function(regs) { return Promise.all(regs.map(function(r) { return r.unregister(); })); }));
+  Promise.all(work).then(done, done);
+}
+
 function renderSettings() {
+  renderVersionInfo();
   document.getElementById('ai-toggle').checked = !!store.aiEnabled;
   document.getElementById('ai-provider').value = store.aiProvider || 'gemini';
   document.getElementById('api-key-input').value = store.apiKey || '';
@@ -10412,6 +10516,8 @@ renderLevelGrid();
 renderHomePetChip();
 renderResumeBanner();
 renderAINudgeBanner();
+renderVersionInfo();
+checkForUpdate(false);
 initPetEyeTracking();
 maybeShowOnboarding();
 
